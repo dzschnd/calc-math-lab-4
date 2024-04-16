@@ -9,6 +9,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.util.Pair;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,9 +31,20 @@ public class InputHandler implements EventHandler<ActionEvent> {
                     double y = Double.parseDouble(dotInput.split("\\s*;\\s*")[1].replace(")", ""));
                     dotMap.put(x, y);
                 }
-                Pair<String, DoubleUnaryOperator> approximatedFunctionPair = approximateFunction(dotMap);
-                DoubleUnaryOperator approximatedFunction = approximatedFunctionPair.getValue();
-                String approximatedFunctionToString = approximatedFunctionPair.getKey();
+
+                Pair<String, DoubleUnaryOperator>[] approximatedFunctionPairs = new Pair[]{  FunctionApproximator.approximateLinear(dotMap),
+                                                                FunctionApproximator.approximateSquare(dotMap),
+                                                                FunctionApproximator.approximateCube(dotMap),
+                                                                FunctionApproximator.approximatePower(dotMap),
+                                                                FunctionApproximator.approximateExponent(dotMap),
+                                                                FunctionApproximator.approximateLogarithm(dotMap)};
+                Pair<String, DoubleUnaryOperator> bestApproximatedFunctionPair = approximatedFunctionPairs[0];
+                for (int i = 1; i < approximatedFunctionPairs.length; i++) {
+                    if (calculateStandardDeviation(dotMap, approximatedFunctionPairs[i].getValue()) < calculateStandardDeviation(dotMap, bestApproximatedFunctionPair.getValue()))
+                        bestApproximatedFunctionPair = approximatedFunctionPairs[i];
+                }
+                DoubleUnaryOperator approximatedFunction = bestApproximatedFunctionPair.getValue();
+                String approximatedFunctionToString = bestApproximatedFunctionPair.getKey();
                 double standardDeviation = calculateStandardDeviation(dotMap, approximatedFunction);
                 double determinationCoefficient = calculateDeterminationCoefficient(dotMap, approximatedFunction);
                 double correlationCoefficient = calculateCorrelationCoefficient(dotMap);
@@ -48,24 +60,17 @@ public class InputHandler implements EventHandler<ActionEvent> {
 
                 createTable(dotMap, approximatedFunction);
 
-                drawPlot(dotInputs, dotMap, approximatedFunction);
+                ArrayList<DoubleUnaryOperator> fList = new ArrayList<>();
+                for (int i = 0; i < approximatedFunctionPairs.length; i++) {
+                    fList.add(approximatedFunctionPairs[i].getValue());
+                }
+                drawPlot(dotInputs, dotMap, fList);
             } catch (NumberFormatException e) {
                setErrorMessage("Неверный формат ввода");
             } catch (ArithmeticException e) {
                 setErrorMessage("Невозможно аппроксимировать функцию");
             }
         }
-    }
-    private static Pair<String, DoubleUnaryOperator> approximateFunction(HashMap<Double, Double> dotMap) {
-        return switch (METHOD_INPUT.getValue().toString()) {
-            case "Линейная аппроксимация" -> FunctionApproximator.approximateLinear(dotMap);
-            case "Квадратичная аппроксимация" -> FunctionApproximator.approximateSquare(dotMap);
-            case "Кубическая аппроксимация" -> FunctionApproximator.approximateCube(dotMap);
-            case "Степенная аппроксимация" -> FunctionApproximator.approximatePower(dotMap);
-            case "Экспоненциальная аппроксимация" -> FunctionApproximator.approximateExponent(dotMap);
-            case "Логарифмическая аппроксимация" -> FunctionApproximator.approximateLogarithm(dotMap);
-            default -> null;
-        };
     }
     private static double calculateStandardDeviation(HashMap<Double, Double> dotMap, DoubleUnaryOperator approximatedFunction) {
         double approxYDevSquareSum = 0;
@@ -162,12 +167,12 @@ public class InputHandler implements EventHandler<ActionEvent> {
         TABLE_BOX.getChildren().clear();
         TABLE_BOX.getChildren().add(table);
     }
-    private static void drawPlot(String[] dotInputs, HashMap<Double, Double> dotMap, DoubleUnaryOperator approximatedFunction) {
+    private static void drawPlot(String[] dotInputs, HashMap<Double, Double> dotMap, ArrayList<DoubleUnaryOperator> fList) {
         double leftBorder = Double.parseDouble(dotInputs[0].split("\\s*;\\s*")[0].replace("(", "")) - 10;
         double rightBorder = Double.parseDouble(dotInputs[dotInputs.length - 1].split("\\s*;\\s*")[0].replace("(", "")) + 10;
         double lowerBorder = Double.parseDouble(dotInputs[0].split("\\s*;\\s*")[1].replace(")", "")) - 10;
         double upperBorder = Double.parseDouble(dotInputs[dotInputs.length - 1].split("\\s*;\\s*")[1].replace(")", "")) + 10;
-        PlotDrawer.drawPlot(leftBorder, rightBorder, lowerBorder, upperBorder, dotMap, approximatedFunction);
+        PlotDrawer.drawPlot(leftBorder, rightBorder, lowerBorder, upperBorder, dotMap, fList);
     }
     private static void setErrorMessage(String errorMessage) {
         APPROXIMATED_FUNCTION_MESSAGE.setText("");
